@@ -1,0 +1,12 @@
+const express = require('express');
+const router = express.Router();
+const eventController = require('../controller/controladorEventos');
+const { verifyToken, requireAdmin } = require('../middelware/authmiddelware');
+
+router.get('/', eventController.listAcceptedEvents);
+router.post('/solicitar', verifyToken, eventController.requestEvent);
+router.get('/pendientes', verifyToken, requireAdmin, eventController.getPendingEvents);
+router.put('/aceptar/:id', verifyToken, requireAdmin, eventController.acceptEvent);
+router.put('/rechazar/:id', verifyToken, requireAdmin, eventController.rejectEvent);
+
+module.exports = router;
