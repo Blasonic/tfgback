@@ -8,14 +8,14 @@ exports.listAcceptedEvents = async (req, res) => {
 };
 
 exports.requestEvent = async (req, res) => {
-  const { titulo, descripcion, fecha, hora, tipo } = req.body;
+  const { titulo, descripcion, fecha, hora, tipo, imagen } = req.body;
   const creado_por = req.user.id;
-  if (!(titulo && fecha && hora && tipo)) {
+  if (!(titulo && fecha && hora && tipo && imagen)) {
     return res.status(400).json({ message: 'Faltan datos obligatorios' });
   }
   await pool.query(
-    'INSERT INTO fiestas (titulo, descripcion, fecha, hora, tipo, creado_por) VALUES (?, ?, ?, ?, ?, ?)',
-    [titulo, descripcion, fecha, hora, tipo, creado_por]
+    'INSERT INTO fiestas (titulo, descripcion, fecha, hora, tipo, creado_por, imagen) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [titulo, descripcion, fecha, hora, tipo, creado_por, imagen]
   );
   res.status(201).json({ message: 'Solicitud enviada' });
 };
