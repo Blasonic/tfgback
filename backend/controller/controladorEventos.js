@@ -8,17 +8,34 @@ exports.listAcceptedEvents = async (req, res) => {
 };
 
 exports.requestEvent = async (req, res) => {
-  const { titulo, descripcion, fecha, hora, tipo, imagen, provincia, direccion } = req.body;
+  const {
+    titulo,
+    descripcion,
+    fecha_inicio,
+    fecha_fin,
+    hora_inicio,
+    hora_fin,
+    tipo,
+    imagen,
+    provincia,
+    direccion
+  } = req.body;
+
   const creado_por = req.user.id;
-  if (!(titulo && fecha && hora && tipo && imagen)) {
+
+  if (!(titulo && fecha_inicio && fecha_fin && hora_inicio && hora_fin && tipo && imagen)) {
     return res.status(400).json({ message: 'Faltan datos obligatorios' });
   }
+
   await pool.query(
-    'INSERT INTO fiestas (titulo, descripcion, fecha, hora, tipo, creado_por, imagen, provincia, direccion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [titulo, descripcion, fecha, hora, tipo, creado_por, imagen, provincia, direccion]
+    `INSERT INTO fiestas (titulo, descripcion, fecha_inicio, fecha_fin, hora_inicio, hora_fin, tipo, imagen, provincia, direccion, creado_por)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [titulo, descripcion, fecha_inicio, fecha_fin, hora_inicio, hora_fin, tipo, imagen, provincia, direccion, creado_por]
   );
+
   res.status(201).json({ message: 'Solicitud enviada' });
 };
+
 
 exports.getPendingEvents = async (req, res) => {
   const [rows] = await pool.query(
