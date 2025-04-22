@@ -13,11 +13,15 @@ const verifyToken = (req, res, next) => {
   }
 };
 
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'jaime200@planzo.com';
+
 const requireAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
+  if (req.user.email !== ADMIN_EMAIL) {
     return res.status(403).json({ message: 'Acceso solo para administradores' });
   }
   next();
 };
+
+
 
 module.exports = { verifyToken, requireAdmin };
