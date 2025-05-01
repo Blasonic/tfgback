@@ -13,7 +13,7 @@ exports.listAcceptedEvents = async (req, res) => {
   }
 };
 
-// ✅ Solicitar un nuevo evento (hora opcional y estado = pendiente)
+// ✅ Solicitar un nuevo evento (estado inicial: pendiente)
 exports.requestEvent = async (req, res) => {
   const {
     titulo,
@@ -50,7 +50,7 @@ exports.requestEvent = async (req, res) => {
         provincia,
         direccion,
         creado_por,
-        'pendiente' // ⬅️ Estado por defecto como pendiente
+        'pendiente'
       ]
     );
 
@@ -74,7 +74,7 @@ exports.getPendingEvents = async (req, res) => {
   }
 };
 
-// ✅ Aceptar evento
+// ✅ Aceptar evento (cambia estado a aceptado)
 exports.acceptEvent = async (req, res) => {
   try {
     await pool.query('UPDATE fiestas SET estado = "aceptado" WHERE id = ?', [req.params.id]);
@@ -85,13 +85,13 @@ exports.acceptEvent = async (req, res) => {
   }
 };
 
-// ✅ Rechazar evento
+// ✅ Rechazar evento (elimina el registro)
 exports.rejectEvent = async (req, res) => {
   try {
-    await pool.query('UPDATE fiestas SET estado = "rechazado" WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Evento rechazado' });
+    await pool.query('DELETE FROM fiestas WHERE id = ?', [req.params.id]);
+    res.json({ message: 'Evento eliminado' });
   } catch (error) {
     console.error('Error en rejectEvent:', error);
-    res.status(500).json({ message: 'Error al rechazar evento' });
+    res.status(500).json({ message: 'Error al eliminar evento' });
   }
 };
