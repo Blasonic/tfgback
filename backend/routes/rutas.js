@@ -7,6 +7,6 @@ router.get('/aceptadas', eventController.listAcceptedEvents);
 router.post('/solicitar', verifyToken, eventController.requestEvent);
 router.get('/pendientes', verifyToken, requireAdmin, eventController.getPendingEvents);
 router.put('/aceptar/:id', verifyToken, requireAdmin, eventController.acceptEvent);
-router.put('/rechazar/:id', verifyToken, requireAdmin, eventController.rejectEvent);
+router.delete('/:id', verifyToken, requireAdmin, eventController.rejectEvent);
 
 module.exports = router;
