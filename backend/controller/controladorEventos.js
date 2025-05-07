@@ -1,17 +1,39 @@
 const { pool } = require('../models/db');
+const { getUserById } = require('./controladorMongo');
 
-// ✅ Obtener eventos aceptados
 exports.listAcceptedEvents = async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [eventos] = await pool.query(
       'SELECT * FROM fiestas WHERE estado = "aceptado" ORDER BY fecha_inicio, hora_inicio'
     );
-    res.json(rows);
+
+    const eventosConUsuarios = await Promise.all(
+      eventos.map(async (evento) => {
+        if (!evento.creado_por) return evento;
+
+        const user = await getUserById(evento.creado_por); // 👈 Aquí se busca al usuario
+
+        if (user?.role === 'user') {
+          return {
+            ...evento,
+            creador_nombre: user.user,
+            creador_foto: user.profilePicture,
+            creador_rol: user.role
+          };
+        }
+
+        return evento;
+      })
+    );
+
+    res.json(eventosConUsuarios);
   } catch (error) {
     console.error('Error en listAcceptedEvents:', error);
     res.status(500).json({ message: 'Error cargando eventos' });
   }
 };
+
+
 
 // ✅ Solicitar un nuevo evento (estado inicial: pendiente)
 exports.requestEvent = async (req, res) => {
