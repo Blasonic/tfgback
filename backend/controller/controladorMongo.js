@@ -1,9 +1,9 @@
+// controladorMongo.js en el backend de fiestas (MySQL)
 const axios = require('axios');
 
-const USUARIOS_API = process.env.USUARIOS_API || 'http://localhost:3001'; // URL del backend de usuarios
-const API_KEY = process.env.INTERNAL_API_KEY || 'Jirafa2004'; // debe coincidir con el .env del backend Mongo
+const USUARIOS_API = process.env.USUARIOS_API || 'http://localhost:5000';
+const API_KEY = process.env.INTERNAL_API_KEY || 'Jirafa2004';
 
-// Caché en memoria simple
 const userCache = new Map();
 
 async function getUserById(id) {
@@ -19,7 +19,7 @@ async function getUserById(id) {
     });
 
     const user = res.data;
-    userCache.set(id, user); // guardamos en caché
+    userCache.set(id, user);
     return user;
   } catch (error) {
     console.warn(`❌ Error al obtener usuario ${id}:`, error.response?.data || error.message);

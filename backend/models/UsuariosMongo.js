@@ -1,11 +1,11 @@
-// models/Usuario.js
+// modelo/Usuario.js
 const mongoose = require('mongoose');
 
 const usuarioSchema = new mongoose.Schema({
-  nombre_usuario: String,
-  foto: String,
-  rol: String,
-  // otros campos si los tienes
+  user: String,               // nombre de usuario (p. ej., "Danisito")
+  profilePicture: String,     // ruta a la imagen
+  role: String                // debe ser 'user' o 'admin'
 });
 
 module.exports = mongoose.model('Usuario', usuarioSchema);
+
