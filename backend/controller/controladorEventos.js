@@ -1,9 +1,9 @@
-const { pool } = require('../models/db');
+const db = require('../models/db');
 const { getUserById } = require('./controladorMongo');
 
 exports.listAcceptedEvents = async (req, res) => {
   try {
-    const [eventos] = await pool.query(
+    const [eventos] = await db.query(
       'SELECT * FROM fiestas WHERE estado = "aceptado" ORDER BY fecha_inicio, hora_inicio'
     );
 
@@ -57,7 +57,7 @@ exports.requestEvent = async (req, res) => {
   }
 
   try {
-    await pool.query(
+    await db.query(
       `INSERT INTO fiestas (titulo, descripcion, fecha_inicio, fecha_fin, hora_inicio, hora_fin, tipo, imagen, provincia, direccion, creado_por, estado)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -86,7 +86,7 @@ exports.requestEvent = async (req, res) => {
 // ✅ Obtener eventos pendientes
 exports.getPendingEvents = async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await db.query(
       'SELECT * FROM fiestas WHERE estado = "pendiente" ORDER BY creado_en DESC'
     );
     res.json(rows);
@@ -99,7 +99,7 @@ exports.getPendingEvents = async (req, res) => {
 // ✅ Aceptar evento (cambia estado a aceptado)
 exports.acceptEvent = async (req, res) => {
   try {
-    await pool.query('UPDATE fiestas SET estado = "aceptado" WHERE id = ?', [req.params.id]);
+    await db.query('UPDATE fiestas SET estado = "aceptado" WHERE id = ?', [req.params.id]);
     res.json({ message: 'Evento aceptado' });
   } catch (error) {
     console.error('Error en acceptEvent:', error);
@@ -110,7 +110,7 @@ exports.acceptEvent = async (req, res) => {
 // ✅ Rechazar evento (elimina el registro)
 exports.rejectEvent = async (req, res) => {
   try {
-    await pool.query('DELETE FROM fiestas WHERE id = ?', [req.params.id]);
+    await db.query('DELETE FROM fiestas WHERE id = ?', [req.params.id]);
     res.json({ message: 'Evento eliminado' });
   } catch (error) {
     console.error('Error en rejectEvent:', error);

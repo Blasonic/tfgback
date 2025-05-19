@@ -1,16 +1,19 @@
 const express = require('express');
-require('dotenv').config();
 const cors = require('cors');
 const app = express();
+require('dotenv').config();
 
-const eventRoutes = require('./routes/rutas');
-
+const soporteRoutes = require('./routes/rutasSoporte'); // ← nuevo archivo separado
+const fiestasRoutes = require('./routes/rutas');   // ← las de antes
 
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/fiestas', eventRoutes);
-
+// Rutas
+app.use('/api/soporte', soporteRoutes);   // 👈 ahora soporte tiene su propio namespace
+app.use('/api/fiestas', fiestasRoutes);   // fiestas sigue igual
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor de eventos escuchando en puerto ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en el puerto ${PORT}`);
+});

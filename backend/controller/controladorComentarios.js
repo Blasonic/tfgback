@@ -1,4 +1,4 @@
-const { pool } = require('../models/db');
+const db = require('../models/db');
 const { getUserById } = require('./controladorMongo');
 
 // POST /api/comentarios
@@ -12,7 +12,7 @@ exports.crearComentario = async (req, res) => {
 
   try {
     // Evitar comentarios duplicados del mismo usuario en el mismo evento
-    const [yaComentado] = await pool.query(
+    const [yaComentado] = await db.query(
       'SELECT id FROM comentarios WHERE fiesta_id = ? AND autor_id = ?',
       [fiesta_id, autor_id]
     );
@@ -21,12 +21,12 @@ exports.crearComentario = async (req, res) => {
       return res.status(400).json({ message: 'Ya has comentado en este evento' });
     }
 
-    const [[fiesta]] = await pool.query('SELECT creado_por FROM fiestas WHERE id = ?', [fiesta_id]);
+    const [[fiesta]] = await db.query('SELECT creado_por FROM fiestas WHERE id = ?', [fiesta_id]);
     if (!fiesta) return res.status(404).json({ message: 'Fiesta no encontrada' });
 
     const receptor_id = fiesta.creado_por;
 
-    await pool.query(`
+    await db.query(`
       INSERT INTO comentarios (fiesta_id, autor_id, receptor_id, estrellas, texto)
       VALUES (?, ?, ?, ?, ?)`,
       [fiesta_id, autor_id, receptor_id, estrellas, texto]
@@ -45,7 +45,7 @@ exports.obtenerComentariosRecibidos = async (req, res) => {
   const receptor_id = req.user.id;
 
   try {
-    const [comentarios] = await pool.query(`
+    const [comentarios] = await db.query(`
       SELECT c.*, f.titulo AS titulo_fiesta
       FROM comentarios c
       JOIN fiestas f ON c.fiesta_id = f.id
@@ -76,7 +76,7 @@ exports.obtenerComentariosEnviados = async (req, res) => {
   const autor_id = req.user.id;
 
   try {
-    const [comentarios] = await pool.query(`
+    const [comentarios] = await db.query(`
       SELECT c.*, f.titulo AS titulo_fiesta
       FROM comentarios c
       JOIN fiestas f ON c.fiesta_id = f.id
@@ -95,7 +95,7 @@ exports.getComentariosPorEvento = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [comentarios] = await pool.query(`
+    const [comentarios] = await db.query(`
       SELECT c.*, f.titulo AS titulo_fiesta
       FROM comentarios c
       JOIN fiestas f ON c.fiesta_id = f.id

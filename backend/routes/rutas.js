@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const eventController = require('../controller/controladorEventos');
+const controladorSoporte = require('../controller/controladorSoporte');
 const comentariosController = require('../controller/controladorComentarios');
 const { verifyToken, requireAdmin } = require('../middelware/authmiddelware');
 
@@ -17,5 +18,9 @@ router.get('/comentarios/mis-fiestas', verifyToken, comentariosController.obtene
 router.get('/comentarios/enviados', verifyToken, comentariosController.obtenerComentariosEnviados);
 router.get('/comentarios/por-evento/:id', verifyToken, comentariosController.getComentariosPorEvento);
 
+
+router.post("/crear", controladorSoporte.crearMensaje);
+router.get("/lista", controladorSoporte.listarMensajes);
+router.post("/responder", controladorSoporte.responderMensaje);
 
 module.exports = router;
