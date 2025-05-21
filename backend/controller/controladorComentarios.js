@@ -11,7 +11,6 @@ exports.crearComentario = async (req, res) => {
   }
 
   try {
-    // Evitar comentarios duplicados del mismo usuario en el mismo evento
     const [yaComentado] = await db.query(
       'SELECT id FROM comentarios WHERE fiesta_id = ? AND autor_id = ?',
       [fiesta_id, autor_id]
@@ -38,7 +37,6 @@ exports.crearComentario = async (req, res) => {
     res.status(500).json({ message: 'Error al guardar el comentario' });
   }
 };
-
 
 // GET /api/comentarios/mis-fiestas
 exports.obtenerComentariosRecibidos = async (req, res) => {
@@ -90,6 +88,7 @@ exports.obtenerComentariosEnviados = async (req, res) => {
     res.status(500).json({ message: 'Error al obtener tus comentarios' });
   }
 };
+
 // GET /api/comentarios/por-evento/:id
 exports.getComentariosPorEvento = async (req, res) => {
   const { id } = req.params;
@@ -121,4 +120,31 @@ exports.getComentariosPorEvento = async (req, res) => {
   }
 };
 
+// GET /api/comentarios/top
+exports.getComentariosTop = async (req, res) => {
+  try {
+    const [comentarios] = await db.query(`
+      SELECT c.*, f.titulo AS titulo_fiesta
+      FROM comentarios c
+      JOIN fiestas f ON c.fiesta_id = f.id
+      ORDER BY c.estrellas DESC, c.fecha_creacion DESC
+      LIMIT 10
+    `);
 
+    const comentariosConAutor = await Promise.all(
+      comentarios.map(async (c) => {
+        const autor = await getUserById(c.autor_id);
+        return {
+          ...c,
+          autor_nombre: autor?.user || 'Anónimo',
+          autor_avatar: autor?.profilePicture || null
+        };
+      })
+    );
+
+    res.json(comentariosConAutor);
+  } catch (error) {
+    console.error('Error en getComentariosTop:', error);
+    res.status(500).json({ message: 'Error al obtener comentarios destacados' });
+  }
+};

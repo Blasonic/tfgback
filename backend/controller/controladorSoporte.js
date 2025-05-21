@@ -11,19 +11,28 @@ exports.crearMensaje = async (req, res) => {
   }
 
   try {
-    const userData = await getUserById(userId);
+    console.log("🔑 ID del usuario extraído del token:", userId);
 
-    if (!userData || !userData.correo) {
+    const userData = await getUserById(userId);
+    console.log("📦 Datos del usuario desde Mongo:", userData);
+
+    if (!userData || !userData.email) {
       return res.status(404).json({ status: "error", message: "Correo del usuario no encontrado" });
     }
 
-    const correo = userData.correo;
+    const correo = userData.email;
+
+    console.log("✉️ Preparando para insertar mensaje en la base de datos:");
+    console.log("📧 Correo:", correo);
+    console.log("📨 Asunto:", asunto);
+    console.log("📝 Mensaje:", mensaje);
 
     const [result] = await db.query(
       "INSERT INTO soporte_mensajes (correo, asunto, mensaje) VALUES (?, ?, ?)",
       [correo, asunto, mensaje]
     );
 
+    console.log("✅ Mensaje insertado correctamente. ID:", result.insertId);
     res.json({ status: "ok", id: result.insertId });
   } catch (err) {
     console.error("❌ Error en crearMensaje:", err);
@@ -55,6 +64,7 @@ exports.responderMensaje = async (req, res) => {
       return res.status(400).json({ status: "error", message: "Ya fue respondido o no existe." });
     }
 
+    console.log(`📬 Respuesta registrada para mensaje ID ${id}`);
     res.json({ status: "ok" });
   } catch (err) {
     console.error("❌ Error al responder mensaje:", err);
