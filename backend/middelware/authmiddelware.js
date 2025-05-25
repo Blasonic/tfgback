@@ -1,7 +1,6 @@
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'Qca200@';
 
-
 const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ message: 'Token requerido' });
@@ -14,7 +13,6 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-
 const requireAdmin = (req, res, next) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ message: 'Acceso solo para administradores' });
@@ -22,4 +20,9 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-module.exports = { verifyToken, requireAdmin };
+// Añadimos alias para que "authMiddleware" apunte a verifyToken
+module.exports = {
+  verifyToken,
+  requireAdmin,
+  authMiddleware: verifyToken
+};

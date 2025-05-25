@@ -1,27 +1,49 @@
 const express = require('express');
 const router = express.Router();
-const {
-  crearComentario,
-  obtenerComentariosRecibidos,
-  obtenerComentariosEnviados,
-  getComentariosPorEvento,
-  getComentariosTop
-} = require('../controladores/controladorComentarios');
-const { authMiddleware } = require('../middlewares/authMiddleware');
 
-// Crear un nuevo comentario (requiere autenticación)
-router.post('/', authMiddleware, crearComentario);
+// Importar controlador completo
+let controlador;
 
-// Comentarios recibidos por el usuario autenticado
-router.get('/mis-fiestas', authMiddleware, obtenerComentariosRecibidos);
+try {
+  controlador = require('../controller/controladorComentarios');
+  console.log('✅ controladorComentarios cargado correctamente');
+} catch (err) {
+  console.error('❌ Error cargando controladorComentarios:', err);
+  process.exit(1);
+}
 
-// Comentarios enviados por el usuario autenticado
-router.get('/enviados', authMiddleware, obtenerComentariosEnviados);
+// Importar middleware de autenticación
+let authMiddleware;
+try {
+  const auth = require('../middelware/authmiddelware');
+  authMiddleware = auth.authMiddleware;
+  console.log('✅ authmiddelware cargado correctamente');
+} catch (err) {
+  console.error('❌ Error cargando authmiddelware:', err);
+  process.exit(1);
+}
 
-// Comentarios de un evento específico (público)
-router.get('/por-evento/:id', getComentariosPorEvento);
+// Verificar que todos los handlers estén definidos
+const handlers = [
+  'crearComentario',
+  'obtenerComentariosRecibidos',
+  'obtenerComentariosEnviados',
+  'getComentariosPorEvento',
+  'getComentariosTop'
+];
 
-// Comentarios mejor valorados (público)
-router.get('/top', getComentariosTop);
+handlers.forEach((fn) => {
+  if (typeof controlador[fn] !== 'function') {
+    console.error(`❌ Handler "${fn}" no está definido o no es una función`);
+    process.exit(1);
+  }
+});
+
+// Definición de rutas
+router.post('/', authMiddleware, controlador.crearComentario);
+router.get('/mis-fiestas', authMiddleware, controlador.obtenerComentariosRecibidos);
+router.get('/enviados', authMiddleware, controlador.obtenerComentariosEnviados);
+router.get('/por-evento/:id', controlador.getComentariosPorEvento); // pública
+router.get('/top', controlador.getComentariosTop); // pública
 
 module.exports = router;

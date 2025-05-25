@@ -3,17 +3,16 @@ const cors = require('cors');
 const app = express();
 require('dotenv').config();
 
-const soporteRoutes = require('./routes/rutasSoporte');       // Soporte técnico
-const fiestasRoutes = require('./routes/rutas');              // Fiestas
-const comentariosRoutes = require('./routes/rutasComentarios'); // Comentarios 👈 NUEVO
+const soporteRoutes = require('./routes/rutasSoporte');
+const fiestasRoutes = require('./routes/rutas');
+const comentariosRoutes = require('./routes/rutasComentarios'); // ✅
 
 app.use(cors());
 app.use(express.json());
 
-// Rutas
 app.use('/api/soporte', soporteRoutes);
 app.use('/api/fiestas', fiestasRoutes);
-app.use('/api/comentarios', comentariosRoutes); // 👈 Añadido
+app.use('/api/comentarios', comentariosRoutes); // ✅
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
