@@ -6,7 +6,6 @@ let controlador;
 
 try {
   controlador = require('../controller/controladorComentarios');
-  console.log('✅ controladorComentarios cargado correctamente');
 } catch (err) {
   console.error('❌ Error cargando controladorComentarios:', err);
   process.exit(1);
@@ -17,7 +16,7 @@ let authMiddleware;
 try {
   const auth = require('../middelware/authmiddelware');
   authMiddleware = auth.authMiddleware;
-  console.log('✅ authmiddelware cargado correctamente');
+
 } catch (err) {
   console.error('❌ Error cargando authmiddelware:', err);
   process.exit(1);
