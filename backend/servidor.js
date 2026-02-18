@@ -5,14 +5,16 @@ require('dotenv').config();
 
 const soporteRoutes = require('./routes/rutasSoporte');
 const fiestasRoutes = require('./routes/rutas');
-const comentariosRoutes = require('./routes/rutasComentarios'); // ✅
+const comentariosRoutes = require('./routes/rutasComentarios');
 
 app.use(cors());
 app.use(express.json());
 
+app.get('/api/health', (_req, res) => res.json({ ok: true }));
+
 app.use('/api/soporte', soporteRoutes);
 app.use('/api/fiestas', fiestasRoutes);
-app.use('/api/comentarios', comentariosRoutes); // ✅
+app.use('/api/comentarios', comentariosRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

@@ -1,119 +1,177 @@
-const db = require('../models/db');
-const { getUserById } = require('./controladorMongo');
+const db = require("../models/db");
 
+function safeTags(v) {
+  return Array.isArray(v) ? v : [];
+}
+
+/**
+ * GET /api/fiestas/aceptadas (pública)
+ * published + no borradas
+ */
 exports.listAcceptedEvents = async (req, res) => {
   try {
-    const [eventos] = await db.query(
-      'SELECT * FROM fiestas WHERE estado = "aceptado" ORDER BY fecha_inicio, hora_inicio'
+    const [rows] = await db.query(
+      `SELECT *
+       FROM fiestas
+       WHERE estado = 'published'
+         AND is_deleted = 0
+       ORDER BY start_at ASC`
     );
-
-    const eventosConUsuarios = await Promise.all(
-      eventos.map(async (evento) => {
-        if (!evento.creado_por) return evento;
-
-        const user = await getUserById(evento.creado_por); // 👈 Aquí se busca al usuario
-
-        if (user?.role === 'user') {
-          return {
-            ...evento,
-            creador_nombre: user.user,
-            creador_foto: user.profilePicture,
-            creador_rol: user.role
-          };
-        }
-
-        return evento;
-      })
-    );
-
-    res.json(eventosConUsuarios);
+    res.json(rows);
   } catch (error) {
-    console.error('Error en listAcceptedEvents:', error);
-    res.status(500).json({ message: 'Error cargando eventos' });
+    console.error("Error en listAcceptedEvents:", error);
+    res.status(500).json({ message: "Error cargando eventos" });
   }
 };
 
-
-
-// ✅ Solicitar un nuevo evento (estado inicial: pendiente)
+/**
+ * POST /api/fiestas/solicitar (auth)
+ * Insertamos como "draft" (pendiente de revisión)
+ */
 exports.requestEvent = async (req, res) => {
   const {
     titulo,
     descripcion,
-    fecha_inicio,
-    fecha_fin,
-    hora_inicio,
-    hora_fin,
-    tipo,
+    start_at,
+    end_at,
+
+    categoria,
+    categoria_detalle,
+    tags,
+
     imagen,
     provincia,
-    direccion
+    municipio,
+    direccion,
+
+    lat,
+    lng,
   } = req.body;
 
-  const creado_por = req.user?.id;
+  const creado_por_uid = req.user?.id;
 
-  if (!(titulo && fecha_inicio && fecha_fin && tipo && imagen)) {
-    return res.status(400).json({ message: 'Faltan datos obligatorios' });
+  if (!creado_por_uid) {
+    return res.status(401).json({ message: "No autorizado" });
+  }
+
+  if (!titulo || !descripcion || !start_at || !end_at || !categoria) {
+    return res.status(400).json({
+      message: "Faltan datos obligatorios (titulo, descripcion, start_at, end_at, categoria)",
+    });
   }
 
   try {
     await db.query(
-      `INSERT INTO fiestas (titulo, descripcion, fecha_inicio, fecha_fin, hora_inicio, hora_fin, tipo, imagen, provincia, direccion, creado_por, estado)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO fiestas
+        (titulo, descripcion, start_at, end_at, tipo,
+         categoria, categoria_detalle, tags_json,
+         estado, creado_por_uid, imagen, provincia, municipio, direccion, lat, lng,
+         is_deleted)
+       VALUES
+        (?, ?, ?, ?, ?,
+         ?, ?, ?,
+         'draft', ?, ?, ?, ?, ?, ?, ?,
+         0)`,
       [
-        titulo,
-        descripcion,
-        fecha_inicio,
-        fecha_fin,
-        hora_inicio || null,
-        hora_fin || null,
-        tipo,
-        imagen,
-        provincia,
-        direccion,
-        creado_por,
-        'pendiente'
+        titulo.trim(),
+        descripcion.trim(),
+        start_at,
+        end_at,
+
+        // compat: puedes seguir usando tipo en UI si quieres
+        categoria,
+
+        categoria,
+        categoria_detalle?.trim() || null,
+        JSON.stringify(safeTags(tags)),
+
+        creado_por_uid,
+        imagen?.trim() || null,
+        (provincia || "Madrid").trim(),
+        municipio?.trim() || null,
+        direccion?.trim() || null,
+        typeof lat === "number" ? lat : null,
+        typeof lng === "number" ? lng : null,
       ]
     );
 
-    res.status(201).json({ message: 'Solicitud enviada' });
+    res.status(201).json({ message: "Solicitud enviada" });
   } catch (error) {
-    console.error('Error en requestEvent:', error);
-    res.status(500).json({ message: 'Error al registrar el evento' });
+    console.error("Error en requestEvent:", error);
+    res.status(500).json({ message: "Error al registrar el evento" });
   }
 };
 
-// ✅ Obtener eventos pendientes
+/**
+ * GET /api/fiestas/pendientes (admin)
+ * draft + no borradas
+ */
 exports.getPendingEvents = async (req, res) => {
   try {
     const [rows] = await db.query(
-      'SELECT * FROM fiestas WHERE estado = "pendiente" ORDER BY creado_en DESC'
+      `SELECT *
+       FROM fiestas
+       WHERE estado = 'draft'
+         AND is_deleted = 0
+       ORDER BY created_at DESC`
     );
     res.json(rows);
   } catch (error) {
-    console.error('Error en getPendingEvents:', error);
-    res.status(500).json({ message: 'Error al obtener eventos pendientes' });
+    console.error("Error en getPendingEvents:", error);
+    res.status(500).json({ message: "Error al obtener eventos pendientes" });
   }
 };
 
-// ✅ Aceptar evento (cambia estado a aceptado)
+/**
+ * PUT /api/fiestas/aceptar/:id (admin)
+ * draft -> published
+ */
 exports.acceptEvent = async (req, res) => {
   try {
-    await db.query('UPDATE fiestas SET estado = "aceptado" WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Evento aceptado' });
+    const [r] = await db.query(
+      `UPDATE fiestas
+       SET estado = 'published'
+       WHERE id = ?
+         AND is_deleted = 0`,
+      [req.params.id]
+    );
+
+    if (r.affectedRows === 0) {
+      return res.status(404).json({ message: "Evento no encontrado" });
+    }
+
+    res.json({ message: "Evento aceptado" });
   } catch (error) {
-    console.error('Error en acceptEvent:', error);
-    res.status(500).json({ message: 'Error al aceptar evento' });
+    console.error("Error en acceptEvent:", error);
+    res.status(500).json({ message: "Error al aceptar evento" });
   }
 };
 
-// ✅ Rechazar evento (elimina el registro)
+/**
+ * DELETE /api/fiestas/:id (admin)
+ * soft delete usando columnas que ya tienes
+ */
 exports.rejectEvent = async (req, res) => {
   try {
-    await db.query('DELETE FROM fiestas WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Evento eliminado' });
+    const adminUid = req.user?.id || null;
+
+    const [r] = await db.query(
+      `UPDATE fiestas
+       SET is_deleted = 1,
+           deleted_at = NOW(),
+           deleted_by_uid = ?
+       WHERE id = ?
+         AND is_deleted = 0`,
+      [adminUid, req.params.id]
+    );
+
+    if (r.affectedRows === 0) {
+      return res.status(404).json({ message: "Evento no encontrado" });
+    }
+
+    res.json({ message: "Evento eliminado" });
   } catch (error) {
-    console.error('Error en rejectEvent:', error);
-    res.status(500).json({ message: 'Error al eliminar evento' });
+    console.error("Error en rejectEvent:", error);
+    res.status(500).json({ message: "Error al eliminar evento" });
   }
 };
