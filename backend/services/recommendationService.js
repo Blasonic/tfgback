@@ -1,6 +1,11 @@
+const { haversineKm } = require("./distanceUtils");
+
 function hourFromSqlDate(sqlDate) {
   if (!sqlDate) return null;
+
   const date = new Date(String(sqlDate).replace(" ", "T"));
+  if (Number.isNaN(date.getTime())) return null;
+
   return date.getHours();
 }
 
@@ -22,19 +27,81 @@ function scoreRating(event) {
   const count = Number(event.rating_count || 0);
 
   if (count === 0) return 0;
+
   return Math.min(avg / 5, 1) * 0.1;
+}
+
+function scoreDistanceToBase(event, baseLocation) {
+  if (
+    !baseLocation ||
+    typeof baseLocation.lat !== "number" ||
+    typeof baseLocation.lng !== "number" ||
+    typeof event.lat !== "number" ||
+    typeof event.lng !== "number"
+  ) {
+    return {
+      score: 0,
+      reason: null,
+      distanceKm: null,
+    };
+  }
+
+  const km = haversineKm(baseLocation.lat, baseLocation.lng, event.lat, event.lng);
+
+  if (typeof km !== "number" || Number.isNaN(km)) {
+    return {
+      score: 0,
+      reason: null,
+      distanceKm: null,
+    };
+  }
+
+  if (km < 1.5) {
+    return {
+      score: 0.15,
+      reason: "Muy cerca de tu ubicación",
+      distanceKm: km,
+    };
+  }
+
+  if (km < 3) {
+    return {
+      score: 0.1,
+      reason: "Cerca de tu ubicación",
+      distanceKm: km,
+    };
+  }
+
+  if (km < 6) {
+    return {
+      score: 0.05,
+      reason: "A una distancia razonable",
+      distanceKm: km,
+    };
+  }
+
+  return {
+    score: 0,
+    reason: null,
+    distanceKm: km,
+  };
 }
 
 function getSignals(userProfile) {
   const likedCategories = new Set(userProfile.preferences?.liked_categories || []);
   const likedTags = new Set(userProfile.preferences?.liked_tags || []);
+
   const dismissedEventIds = new Set(
     (userProfile.interactions || [])
       .filter((i) => i.type === "dismiss")
       .map((i) => Number(i.fiestaId))
+      .filter(Boolean)
   );
+
   const savedEventIds = new Set(
-    (userProfile.savedItems || []).map((i) => Number(i.fiestaId))
+    (userProfile.savedItems || [])
+      .map((i) => Number(i.fiestaId))
+      .filter(Boolean)
   );
 
   return {
@@ -45,7 +112,7 @@ function getSignals(userProfile) {
   };
 }
 
-function scoreEvents(events, userProfile, intent) {
+function scoreEvents(events, userProfile, intent, baseLocation = null) {
   const signals = getSignals(userProfile);
 
   return events
@@ -64,7 +131,10 @@ function scoreEvents(events, userProfile, intent) {
         reasons.push(`Encaja en ${intent.categoria}`);
       }
 
-      const matchingTags = (intent.tags || []).filter((tag) => eventTags.includes(tag));
+      const matchingTags = (intent.tags || []).filter((tag) =>
+        eventTags.includes(tag)
+      );
+
       if (matchingTags.length > 0) {
         score += Math.min(0.2, matchingTags.length * 0.08);
         reasons.push(`Coincide en tags: ${matchingTags.join(", ")}`);
@@ -87,10 +157,25 @@ function scoreEvents(events, userProfile, intent) {
         reasons.push("Se parece a tus preferencias");
       }
 
-      const likedTagMatches = eventTags.filter((tag) => signals.likedTags.has(tag));
+      const likedTagMatches = eventTags.filter((tag) =>
+        signals.likedTags.has(tag)
+      );
+
       if (likedTagMatches.length > 0) {
         score += Math.min(0.08, likedTagMatches.length * 0.03);
         reasons.push("Coincide con tags que te gustan");
+      }
+
+      if (intent.nearBaseLocation || intent.useBaseLocation) {
+        const distanceScore = scoreDistanceToBase(event, baseLocation);
+
+        score += distanceScore.score;
+
+        if (distanceScore.reason) {
+          reasons.push(distanceScore.reason);
+        }
+
+        event.distance_from_base_km = distanceScore.distanceKm;
       }
 
       if (signals.dismissedEventIds.has(Number(event.id))) {
@@ -108,7 +193,10 @@ function scoreEvents(events, userProfile, intent) {
         reasons,
       };
     })
-    .sort((a, b) => b.score - a.score || new Date(a.start_at) - new Date(b.start_at));
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return new Date(a.start_at) - new Date(b.start_at);
+    });
 }
 
 module.exports = {

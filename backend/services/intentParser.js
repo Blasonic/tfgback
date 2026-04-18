@@ -3,6 +3,9 @@ const {
   rangeTomorrow,
   rangeThisWeekend,
   rangeThisWeek,
+  rangeThisMonth,
+  rangeNextMonth,
+  rangeSpecificMonth,
   rangeNextWeekday,
   defaultRange14Days,
 } = require("./dateUtils");
@@ -17,6 +20,21 @@ const WEEKDAY_MAP = {
   sabado: 6,
   sábado: 6,
   domingo: 7,
+};
+
+const MONTH_MAP = {
+  enero: 1,
+  febrero: 2,
+  marzo: 3,
+  abril: 4,
+  mayo: 5,
+  junio: 6,
+  julio: 7,
+  agosto: 8,
+  septiembre: 9,
+  octubre: 10,
+  noviembre: 11,
+  diciembre: 12,
 };
 
 const CATEGORY_KEYWORDS = {
@@ -50,9 +68,25 @@ function normalizeText(text = "") {
 function detectIntentType(text) {
   const normalized = normalizeText(text);
 
-  if (/(ruta|itinerario|recorrido|plan completo|en orden)/.test(normalized)) return "route";
-  if (/(distancia|cuanto hay|cuanto esta|lejos|cerca)/.test(normalized)) return "distance";
-  if (/(favoritos|guardados|mis planes guardados)/.test(normalized)) return "favorites";
+  if (
+    /(ruta|itinerario|recorrido|plan completo|en orden|hazme una ruta|ruta de eventos)/.test(
+      normalized
+    )
+  ) {
+    return "route";
+  }
+
+  if (
+    /(como llego|como ir|mejor forma de llegar|a que distancia|distancia|cuanto hay|cuanto esta|lejos|cerca)/.test(
+      normalized
+    )
+  ) {
+    return "distance";
+  }
+
+  if (/(favoritos|guardados|mis planes guardados)/.test(normalized)) {
+    return "favorites";
+  }
 
   return "recommend";
 }
@@ -60,9 +94,17 @@ function detectIntentType(text) {
 function extractTimeWindow(text) {
   const normalized = normalizeText(text);
 
-  if (/\bnoche\b/.test(normalized)) return "night";
-  if (/\btarde\b/.test(normalized)) return "afternoon";
-  if (/\bmanana\b/.test(normalized)) return "morning";
+  if (/esta noche|por la noche|\bnoche\b/.test(normalized)) {
+    return "night";
+  }
+
+  if (/esta tarde|por la tarde|\btarde\b/.test(normalized)) {
+    return "afternoon";
+  }
+
+  if (/esta manana|por la manana|\bmanana\b/.test(normalized)) {
+    return "morning";
+  }
 
   return null;
 }
@@ -74,6 +116,18 @@ function extractDateRange(text) {
   if (/\bmanana\b/.test(normalized)) return rangeTomorrow();
   if (/finde|fin de semana/.test(normalized)) return rangeThisWeekend();
   if (/esta semana/.test(normalized)) return rangeThisWeek();
+
+  if (/este mes/.test(normalized)) return rangeThisMonth();
+  if (/mes que viene|proximo mes|próximo mes/.test(normalized)) return rangeNextMonth();
+
+  for (const [name, month] of Object.entries(MONTH_MAP)) {
+    if (
+      new RegExp(`\\b${name}\\b`).test(normalized) &&
+      /(mes|planes|eventos|que hay|qué hay|ruta)/.test(normalized)
+    ) {
+      return rangeSpecificMonth(month);
+    }
+  }
 
   for (const [name, weekday] of Object.entries(WEEKDAY_MAP)) {
     if (new RegExp(`\\b${name}\\b`).test(normalized)) {
@@ -132,7 +186,90 @@ function extractMunicipio(text, municipios = []) {
 
 function inferNeedBaseLocation(text) {
   const normalized = normalizeText(text);
-  return /(alojamiento|hotel|apartamento|donde me alojo|cerca de mi alojamiento|cerca de mi hotel)/.test(normalized);
+
+  return /(alojamiento|hotel|apartamento|donde me alojo|cerca de mi alojamiento|cerca de mi hotel|cerca de casa|desde casa|desde mi hotel|desde mi alojamiento|desde mi ubicacion|desde mi ubicación)/.test(
+    normalized
+  );
+}
+
+function extractLocationAlias(text) {
+  const normalized = normalizeText(text);
+
+  if (/\bcasa\b/.test(normalized)) return "casa";
+  if (/\bhotel\b/.test(normalized)) return "hotel";
+  if (/\balojamiento\b/.test(normalized)) return "alojamiento";
+  if (/\bapartamento\b/.test(normalized)) return "apartamento";
+
+  return null;
+}
+
+function inferNearBaseLocation(text) {
+  const normalized = normalizeText(text);
+
+  return /(cerca de mi hotel|cerca del hotel|cerca de casa|cerca de mi alojamiento|cerca de donde me alojo|cerca de mi apartamento|cerca de mi ubicacion|cerca de mi ubicación)/.test(
+    normalized
+  );
+}
+
+function inferWantsDirections(text) {
+  const normalized = normalizeText(text);
+
+  return /(como llego|como ir|mejor forma de llegar|como puedo llegar|cómo llego|cómo ir|cómo puedo llegar)/.test(
+    normalized
+  );
+}
+
+function inferMonthQuery(text) {
+  const normalized = normalizeText(text);
+  return /(este mes|mes que viene|proximo mes|próximo mes|planes de|eventos de|que hay en|qué hay en)/.test(
+    normalized
+  );
+}
+
+function detectSaveBaseLocation(text) {
+  const normalized = normalizeText(text);
+
+  return (
+    normalized.includes("guarda mi casa en ") ||
+    normalized.includes("mi casa esta en ") ||
+    normalized.includes("mi casa está en ") ||
+    normalized.includes("vivo en ")
+  );
+}
+
+function detectSaveTemporaryLocation(text) {
+  const normalized = normalizeText(text);
+
+  return (
+    normalized.includes("estoy en ") ||
+    normalized.includes("mi hotel es ") ||
+    normalized.includes("mi alojamiento es ") ||
+    normalized.includes("estoy alojado en ") ||
+    normalized.includes("estoy alojada en ")
+  );
+}
+
+function extractRawLocationText(text) {
+  const normalized = normalizeText(text);
+
+  const patterns = [
+    "guarda mi casa en ",
+    "mi casa esta en ",
+    "vivo en ",
+    "estoy en ",
+    "mi hotel es ",
+    "mi alojamiento es ",
+    "estoy alojado en ",
+    "estoy alojada en ",
+  ];
+
+  for (const pattern of patterns) {
+    if (normalized.includes(pattern)) {
+      return normalized.split(pattern)[1]?.trim() || null;
+    }
+  }
+
+  return null;
 }
 
 function parseMessage(message, municipios = [], previousState = null) {
@@ -141,8 +278,18 @@ function parseMessage(message, municipios = [], previousState = null) {
   const timeWindow = extractTimeWindow(message);
   const categoria = extractCategoria(message);
   const tags = extractTags(message);
-  const municipio = extractMunicipio(message, municipios) || previousState?.municipio || null;
+  const municipio =
+    extractMunicipio(message, municipios) || previousState?.municipio || null;
+
   const useBaseLocation = inferNeedBaseLocation(message);
+  const nearBaseLocation = inferNearBaseLocation(message);
+  const locationAlias = extractLocationAlias(message);
+  const wantsDirections = inferWantsDirections(message);
+  const monthQuery = inferMonthQuery(message);
+
+  const wantsToSaveBaseLocation = detectSaveBaseLocation(message);
+  const wantsToSaveTemporaryLocation = detectSaveTemporaryLocation(message);
+  const rawLocationText = extractRawLocationText(message);
 
   const intent = {
     type,
@@ -152,12 +299,21 @@ function parseMessage(message, municipios = [], previousState = null) {
     categoria,
     tags,
     useBaseLocation,
+    nearBaseLocation,
+    wantsDirections,
+    locationAlias,
+    monthQuery,
+    wantsToSaveBaseLocation,
+    wantsToSaveTemporaryLocation,
+    rawLocationText,
   };
 
   const missing = [];
 
-  if (type === "route" && !municipio && !useBaseLocation) {
-    missing.push("municipio_or_base_location");
+  // Para rutas NO exigimos ubicación del usuario.
+  // Solo necesitamos un contexto geográfico razonable.
+  if (type === "route" && !municipio && !nearBaseLocation && !useBaseLocation) {
+    missing.push("municipio_or_area");
   }
 
   return {

@@ -1,5 +1,6 @@
 const chatbotService = require("../services/chatbotService");
 const firestoreRepo = require("../repositories/firestoreRepo");
+const { geocodeAddress, geocodeFirstResult } = require("../services/geocodingService");
 
 async function processMessage(req, res) {
   try {
@@ -9,7 +10,12 @@ async function processMessage(req, res) {
       return res.status(401).json({ message: "Usuario no autenticado." });
     }
 
-    const { message, conversationState = null, visibleEventIds = [] } = req.body || {};
+    const {
+      message,
+      conversationState = null,
+      visibleEventIds = [],
+      selectedEventId = null,
+    } = req.body || {};
 
     if (!message || typeof message !== "string") {
       return res.status(400).json({ message: "El campo message es obligatorio." });
@@ -20,6 +26,7 @@ async function processMessage(req, res) {
       message,
       conversationState,
       visibleEventIds,
+      selectedEventId,
     });
 
     return res.json(result);
@@ -98,21 +105,119 @@ async function updateBaseLocation(req, res) {
       return res.status(401).json({ message: "Usuario no autenticado." });
     }
 
-    const { label, lat, lng } = req.body || {};
+    const { address } = req.body || {};
 
-    if (!label || typeof lat !== "number" || typeof lng !== "number") {
+    if (!address || typeof address !== "string") {
       return res.status(400).json({
-        message: "label, lat y lng son obligatorios y deben ser válidos.",
+        message: "Debes enviar una dirección válida.",
       });
     }
 
-    await firestoreRepo.updateBaseLocation(uid, { label, lat, lng });
+    const result = await geocodeFirstResult(address);
 
-    return res.json({ ok: true });
+    if (!result || typeof result.lat !== "number" || typeof result.lng !== "number") {
+      return res.status(404).json({
+        message: "No se pudo localizar esa dirección.",
+      });
+    }
+
+    const location = {
+      label: "Casa",
+      address: result.address,
+      lat: result.lat,
+      lng: result.lng,
+    };
+
+    await firestoreRepo.updateBaseLocation(uid, location);
+
+    return res.json({
+      ok: true,
+      location,
+    });
   } catch (error) {
     console.error("[controladorChatbot.updateBaseLocation]", error);
     return res.status(500).json({
       message: error.message || "No se pudo actualizar la ubicación base.",
+    });
+  }
+}
+
+async function updateTemporaryLocation(req, res) {
+  try {
+    const uid = req.user?.id || req.user?.uid;
+
+    if (!uid) {
+      return res.status(401).json({ message: "Usuario no autenticado." });
+    }
+
+    const { query, label = "Ubicación actual" } = req.body || {};
+
+    if (!query || typeof query !== "string") {
+      return res.status(400).json({
+        message: "Debes enviar una ubicación válida.",
+      });
+    }
+
+    const result = await geocodeFirstResult(query);
+
+    if (!result || typeof result.lat !== "number" || typeof result.lng !== "number") {
+      return res.status(404).json({
+        message: "No se pudo localizar esa ubicación.",
+      });
+    }
+
+    await firestoreRepo.saveRecommendationState(uid, {
+      temporary_location: {
+        label,
+        address: result.address,
+        lat: result.lat,
+        lng: result.lng,
+      },
+    });
+
+    return res.json({
+      ok: true,
+      location: {
+        label,
+        address: result.address,
+        lat: result.lat,
+        lng: result.lng,
+      },
+    });
+  } catch (error) {
+    console.error("[controladorChatbot.updateTemporaryLocation]", error);
+    return res.status(500).json({
+      message: error.message || "No se pudo actualizar la ubicación temporal.",
+    });
+  }
+}
+
+async function resolveLocation(req, res) {
+  try {
+    const uid = req.user?.id || req.user?.uid;
+
+    if (!uid) {
+      return res.status(401).json({ message: "Usuario no autenticado." });
+    }
+
+    const { query } = req.body || {};
+
+    if (!query || typeof query !== "string") {
+      return res.status(400).json({
+        message: "Debes enviar una búsqueda válida.",
+      });
+    }
+
+    const results = await geocodeAddress(query);
+
+    return res.json({
+      ok: true,
+      results,
+    });
+  } catch (error) {
+    console.error("[controladorChatbot.resolveLocation]", error);
+    return res.status(500).json({
+      message: error.message || "No se pudo resolver la ubicación.",
     });
   }
 }
@@ -122,4 +227,6 @@ module.exports = {
   trackInteraction,
   getPreferences,
   updateBaseLocation,
+  updateTemporaryLocation,
+  resolveLocation,
 };
