@@ -3,7 +3,11 @@ function toRad(value) {
 }
 
 function haversineKm(lat1, lng1, lat2, lng2) {
-  if ([lat1, lng1, lat2, lng2].some((v) => typeof v !== "number" || Number.isNaN(v))) {
+  if (
+    [lat1, lng1, lat2, lng2].some(
+      (v) => typeof v !== "number" || Number.isNaN(v)
+    )
+  ) {
     return null;
   }
 
@@ -21,6 +25,35 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   return R * c;
 }
 
+function estimateWalkMinutes(km) {
+  if (typeof km !== "number" || Number.isNaN(km)) return null;
+  return Math.round((km / 4.5) * 60);
+}
+
+function estimateCarMinutes(km) {
+  if (typeof km !== "number" || Number.isNaN(km)) return null;
+  return Math.round((km / 25) * 60);
+}
+
+function estimateTransitMinutes(km) {
+  if (typeof km !== "number" || Number.isNaN(km)) return null;
+  return Math.round((km / 18) * 60);
+}
+
+function recommendTransportMode(km) {
+  if (typeof km !== "number" || Number.isNaN(km)) {
+    return "transporte público";
+  }
+
+  if (km < 1.5) return "andando";
+  if (km < 6) return "transporte público o taxi";
+  return "coche o transporte público";
+}
+
 module.exports = {
   haversineKm,
+  estimateWalkMinutes,
+  estimateCarMinutes,
+  estimateTransitMinutes,
+  recommendTransportMode,
 };

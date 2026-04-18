@@ -64,6 +64,41 @@ function rangeThisWeek() {
   };
 }
 
+function rangeThisMonth() {
+  const now = nowMadrid();
+  const from = now.startOf("month");
+  const to = from.plus({ months: 1 });
+
+  return {
+    from: toSql(from),
+    to: toSql(to),
+    label: "este mes",
+  };
+}
+
+function rangeNextMonth() {
+  const now = nowMadrid();
+  const from = now.plus({ months: 1 }).startOf("month");
+  const to = from.plus({ months: 1 });
+
+  return {
+    from: toSql(from),
+    to: toSql(to),
+    label: "mes que viene",
+  };
+}
+
+function rangeSpecificMonth(month, year = nowMadrid().year) {
+  const from = DateTime.fromObject({ year, month, day: 1 }, { zone: ZONE }).startOf("day");
+  const to = from.plus({ months: 1 });
+
+  return {
+    from: toSql(from),
+    to: toSql(to),
+    label: from.setLocale("es").toFormat("LLLL"),
+  };
+}
+
 function rangeNextWeekday(targetWeekday) {
   const now = nowMadrid();
   let candidate = now.startOf("day");
@@ -94,6 +129,9 @@ module.exports = {
   rangeTomorrow,
   rangeThisWeekend,
   rangeThisWeek,
+  rangeThisMonth,
+  rangeNextMonth,
+  rangeSpecificMonth,
   rangeNextWeekday,
   defaultRange14Days,
 };
