@@ -7,6 +7,7 @@ const soporteRoutes = require('./routes/rutasSoporte');
 const fiestasRoutes = require('./routes/rutas');
 const comentariosRoutes = require('./routes/rutasComentarios');
 const chatbotRoutes = require('./routes/rutasChatbot');
+const ayuntamientosRoutes = require('./routes/rutasAyuntamientos');
 
 app.use(cors());
 app.use(express.json());
@@ -17,6 +18,7 @@ app.use('/api/soporte', soporteRoutes);
 app.use('/api/fiestas', fiestasRoutes);
 app.use('/api/comentarios', comentariosRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/ayuntamientos', ayuntamientosRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

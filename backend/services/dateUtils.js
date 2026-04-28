@@ -2,6 +2,10 @@ const { DateTime } = require("luxon");
 
 const ZONE = "Europe/Madrid";
 
+function getLang(language = "es") {
+  return String(language || "es").startsWith("en") ? "en" : "es";
+}
+
 function nowMadrid() {
   return DateTime.now().setZone(ZONE);
 }
@@ -10,7 +14,7 @@ function toSql(dt) {
   return dt.toFormat("yyyy-LL-dd HH:mm:ss");
 }
 
-function rangeToday() {
+function rangeToday(language = "es") {
   const now = nowMadrid();
   const from = now.startOf("day");
   const to = from.plus({ days: 1 });
@@ -18,11 +22,11 @@ function rangeToday() {
   return {
     from: toSql(from),
     to: toSql(to),
-    label: "hoy",
+    label: getLang(language) === "en" ? "today" : "hoy",
   };
 }
 
-function rangeTomorrow() {
+function rangeTomorrow(language = "es") {
   const now = nowMadrid();
   const from = now.startOf("day").plus({ days: 1 });
   const to = from.plus({ days: 1 });
@@ -30,11 +34,11 @@ function rangeTomorrow() {
   return {
     from: toSql(from),
     to: toSql(to),
-    label: "mañana",
+    label: getLang(language) === "en" ? "tomorrow" : "mañana",
   };
 }
 
-function rangeThisWeekend() {
+function rangeThisWeekend(language = "es") {
   const now = nowMadrid();
   let friday = now.startOf("week").plus({ days: 4 });
 
@@ -48,11 +52,11 @@ function rangeThisWeekend() {
   return {
     from: toSql(from),
     to: toSql(to),
-    label: "este finde",
+    label: getLang(language) === "en" ? "this weekend" : "este finde",
   };
 }
 
-function rangeThisWeek() {
+function rangeThisWeek(language = "es") {
   const now = nowMadrid();
   const from = now.startOf("day");
   const to = now.endOf("week").plus({ days: 1 }).startOf("day");
@@ -60,11 +64,11 @@ function rangeThisWeek() {
   return {
     from: toSql(from),
     to: toSql(to),
-    label: "esta semana",
+    label: getLang(language) === "en" ? "this week" : "esta semana",
   };
 }
 
-function rangeThisMonth() {
+function rangeThisMonth(language = "es") {
   const now = nowMadrid();
   const from = now.startOf("month");
   const to = from.plus({ months: 1 });
@@ -72,11 +76,11 @@ function rangeThisMonth() {
   return {
     from: toSql(from),
     to: toSql(to),
-    label: "este mes",
+    label: getLang(language) === "en" ? "this month" : "este mes",
   };
 }
 
-function rangeNextMonth() {
+function rangeNextMonth(language = "es") {
   const now = nowMadrid();
   const from = now.plus({ months: 1 }).startOf("month");
   const to = from.plus({ months: 1 });
@@ -84,22 +88,28 @@ function rangeNextMonth() {
   return {
     from: toSql(from),
     to: toSql(to),
-    label: "mes que viene",
+    label: getLang(language) === "en" ? "next month" : "mes que viene",
   };
 }
 
-function rangeSpecificMonth(month, year = nowMadrid().year) {
-  const from = DateTime.fromObject({ year, month, day: 1 }, { zone: ZONE }).startOf("day");
+function rangeSpecificMonth(month, year = nowMadrid().year, language = "es") {
+  const lang = getLang(language);
+  const from = DateTime.fromObject(
+    { year, month, day: 1 },
+    { zone: ZONE }
+  ).startOf("day");
+
   const to = from.plus({ months: 1 });
 
   return {
     from: toSql(from),
     to: toSql(to),
-    label: from.setLocale("es").toFormat("LLLL"),
+    label: from.setLocale(lang === "en" ? "en" : "es").toFormat("LLLL"),
   };
 }
 
-function rangeNextWeekday(targetWeekday) {
+function rangeNextWeekday(targetWeekday, language = "es") {
+  const lang = getLang(language);
   const now = nowMadrid();
   let candidate = now.startOf("day");
 
@@ -110,17 +120,20 @@ function rangeNextWeekday(targetWeekday) {
   return {
     from: toSql(candidate.startOf("day")),
     to: toSql(candidate.plus({ days: 1 }).startOf("day")),
-    label: candidate.setLocale("es").toFormat("cccc"),
+    label: candidate.setLocale(lang === "en" ? "en" : "es").toFormat("cccc"),
   };
 }
 
-function defaultRange14Days() {
+function defaultRange14Days(language = "es") {
   const now = nowMadrid();
 
   return {
     from: toSql(now.startOf("day")),
     to: toSql(now.startOf("day").plus({ days: 14 })),
-    label: "próximos 14 días",
+    label:
+      getLang(language) === "en"
+        ? "the next 14 days"
+        : "próximos 14 días",
   };
 }
 

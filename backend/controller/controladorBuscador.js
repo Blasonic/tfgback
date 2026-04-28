@@ -1,9 +1,29 @@
 const db = require("../models/db");
 
-/**
- * GET /api/fiestas/buscar
- * Búsqueda pública de fiestas publicadas y no borradas
- */
+function getLang(req) {
+  return req.headers["accept-language"]?.startsWith("en") ? "en" : "es";
+}
+
+const messages = {
+  es: {
+    searchError: "Error al buscar fiestas",
+    filtersError: "Error al obtener filtros",
+    eventNotFound: "Fiesta no encontrada",
+    eventDetailError: "Error al obtener la fiesta",
+  },
+  en: {
+    searchError: "Error searching events",
+    filtersError: "Error retrieving filters",
+    eventNotFound: "Event not found",
+    eventDetailError: "Error retrieving the event",
+  },
+};
+
+function t(req, key) {
+  const lang = getLang(req);
+  return messages[lang][key] || messages.es[key] || key;
+}
+
 exports.searchAcceptedEvents = async (req, res) => {
   try {
     const limitRaw = Number(req.query.limit) || 12;
@@ -142,16 +162,12 @@ exports.searchAcceptedEvents = async (req, res) => {
     console.error("Error en searchAcceptedEvents:", error);
     return res.status(500).json({
       ok: false,
-      message: "Error al buscar fiestas",
+      message: t(req, "searchError"),
     });
   }
 };
 
-/**
- * GET /api/fiestas/filtros
- * Valores disponibles para filtros públicos
- */
-exports.getSearchFilters = async (_req, res) => {
+exports.getSearchFilters = async (req, res) => {
   try {
     const [categorias] = await db.query(`
       SELECT DISTINCT categoria
@@ -195,15 +211,11 @@ exports.getSearchFilters = async (_req, res) => {
     console.error("Error en getSearchFilters:", error);
     return res.status(500).json({
       ok: false,
-      message: "Error al obtener filtros",
+      message: t(req, "filtersError"),
     });
   }
 };
 
-/**
- * GET /api/fiestas/detalle/:id
- * Detalle público de una fiesta
- */
 exports.getAcceptedEventById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -241,7 +253,7 @@ exports.getAcceptedEventById = async (req, res) => {
     if (!rows.length) {
       return res.status(404).json({
         ok: false,
-        message: "Fiesta no encontrada",
+        message: t(req, "eventNotFound"),
       });
     }
 
@@ -253,7 +265,7 @@ exports.getAcceptedEventById = async (req, res) => {
     console.error("Error en getAcceptedEventById:", error);
     return res.status(500).json({
       ok: false,
-      message: "Error al obtener la fiesta",
+      message: t(req, "eventDetailError"),
     });
   }
 };
