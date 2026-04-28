@@ -2,21 +2,58 @@
 const db = require("../models/db");
 const admin = require("../models/firebaseAdmin");
 
-// UID helper (compatible con tu middleware actual)
+function getLang(req) {
+  return req.headers["accept-language"]?.startsWith("en") ? "en" : "es";
+}
+
+const messages = {
+  es: {
+    unauthorized: "No autorizado",
+    invalidFiestaId: "fiesta_id inválido",
+    invalidStars: "estrellas debe ser 1-5",
+    fiestaNotFound: "Fiesta no encontrada",
+    commentSaved: "Comentario guardado",
+    userNotSynced: "Usuario no existe/sincronizado en MySQL",
+    saveCommentError: "Error al guardar el comentario",
+    getCommentsError: "Error al obtener comentarios",
+    getYourCommentsError: "Error al obtener tus comentarios",
+    invalidId: "ID inválido",
+    getEventCommentsError: "Error al obtener comentarios del evento",
+    getTopCommentsError: "Error al obtener comentarios destacados",
+  },
+  en: {
+    unauthorized: "Unauthorized",
+    invalidFiestaId: "Invalid fiesta_id",
+    invalidStars: "stars must be 1-5",
+    fiestaNotFound: "Event not found",
+    commentSaved: "Comment saved",
+    userNotSynced: "User does not exist/is not synchronized in MySQL",
+    saveCommentError: "Error saving the comment",
+    getCommentsError: "Error retrieving comments",
+    getYourCommentsError: "Error retrieving your comments",
+    invalidId: "Invalid ID",
+    getEventCommentsError: "Error retrieving event comments",
+    getTopCommentsError: "Error retrieving featured comments",
+  },
+};
+
+function t(req, key) {
+  const lang = getLang(req);
+  return messages[lang][key] || messages.es[key] || key;
+}
+
 function getUid(req) {
   return req?.auth?.uid || req?.user?.uid || req?.user?.id || null;
 }
 
-// Crea el user en MySQL si no existe (para cumplir FK comentarios.autor_uid -> users.firebase_uid)
 async function ensureMysqlUser(firebaseUid) {
-  // 1) ¿Ya existe?
   const [rows] = await db.query(
     "SELECT firebase_uid FROM users WHERE firebase_uid = ? LIMIT 1",
     [firebaseUid]
   );
+
   if (rows.length > 0) return;
 
-  // 2) Si no existe, lo traemos de Firebase Auth (displayName/photoURL si están)
   let username = null;
   let profilePicture = null;
 
@@ -25,12 +62,10 @@ async function ensureMysqlUser(firebaseUid) {
     username = u.displayName || null;
     profilePicture = u.photoURL || null;
   } catch (e) {
-    // Si por lo que sea no se puede leer (raro), al menos insertamos el UID
     username = null;
     profilePicture = null;
   }
 
-  // 3) Insert (role tiene default 'user' en tu tabla)
   await db.query(
     `
     INSERT INTO users (firebase_uid, username, profile_picture)
@@ -41,8 +76,6 @@ async function ensureMysqlUser(firebaseUid) {
 }
 
 module.exports = {
-  // POST /api/comentarios  (auth)
-  // UPSERT: 1 comentario por user por fiesta (UNIQUE(fiesta_id, autor_uid))
   crearComentario: async (req, res) => {
     const { fiesta_id, estrellas, texto } = req.body;
 
@@ -50,30 +83,34 @@ module.exports = {
     const fiestaId = Number(fiesta_id);
     const estrellasNum = Number(estrellas);
 
-    if (!autor_uid) return res.status(401).json({ message: "No autorizado" });
+    if (!autor_uid) {
+      return res.status(401).json({ message: t(req, "unauthorized") });
+    }
 
     if (!Number.isInteger(fiestaId) || fiestaId <= 0) {
-      return res.status(400).json({ message: "fiesta_id inválido" });
+      return res.status(400).json({ message: t(req, "invalidFiestaId") });
     }
 
-    if (!Number.isInteger(estrellasNum) || estrellasNum < 1 || estrellasNum > 5) {
-      return res.status(400).json({ message: "estrellas debe ser 1-5" });
+    if (
+      !Number.isInteger(estrellasNum) ||
+      estrellasNum < 1 ||
+      estrellasNum > 5
+    ) {
+      return res.status(400).json({ message: t(req, "invalidStars") });
     }
-
-    // texto opcional, pero si quieres obligarlo:
-    // if (typeof texto !== "string" || texto.trim().length === 0) {
-    //   return res.status(400).json({ message: "texto obligatorio" });
-    // }
 
     try {
-      // Verificar que la fiesta existe
-      const [[fiesta]] = await db.query("SELECT id FROM fiestas WHERE id = ?", [fiestaId]);
-      if (!fiesta) return res.status(404).json({ message: "Fiesta no encontrada" });
+      const [[fiesta]] = await db.query(
+        "SELECT id FROM fiestas WHERE id = ?",
+        [fiestaId]
+      );
 
-      // ✅ CLAVE: asegurar que existe user en MySQL para que la FK no falle
+      if (!fiesta) {
+        return res.status(404).json({ message: t(req, "fiestaNotFound") });
+      }
+
       await ensureMysqlUser(autor_uid);
 
-      // Insert/Update comentario (1 por user por fiesta)
       await db.query(
         `
         INSERT INTO comentarios (fiesta_id, autor_uid, estrellas, texto, status)
@@ -87,24 +124,24 @@ module.exports = {
         [fiestaId, autor_uid, estrellasNum, texto || null]
       );
 
-      return res.status(201).json({ message: "Comentario guardado" });
+      return res.status(201).json({ message: t(req, "commentSaved") });
     } catch (error) {
       console.error("Error en crearComentario:", error);
 
-      // Si volviera a pasar una FK por desajuste de datos, que no sea 500 “misterioso”
       if (error.code === "ER_NO_REFERENCED_ROW_2") {
-        return res.status(409).json({ message: "Usuario no existe/sincronizado en MySQL" });
+        return res.status(409).json({ message: t(req, "userNotSynced") });
       }
 
-      return res.status(500).json({ message: "Error al guardar el comentario" });
+      return res.status(500).json({ message: t(req, "saveCommentError") });
     }
   },
 
-  // GET /api/comentarios/mis-fiestas (auth)
-  // Comentarios recibidos en mis fiestas (yo soy creador)
   obtenerComentariosRecibidos: async (req, res) => {
     const miUid = getUid(req);
-    if (!miUid) return res.status(401).json({ message: "No autorizado" });
+
+    if (!miUid) {
+      return res.status(401).json({ message: t(req, "unauthorized") });
+    }
 
     try {
       const [comentarios] = await db.query(
@@ -118,7 +155,6 @@ module.exports = {
           c.created_at AS fecha_creacion,
           c.status,
           f.titulo AS titulo_fiesta,
-
           u.username AS autor_nombre,
           u.profile_picture AS autor_avatar
         FROM comentarios c
@@ -134,14 +170,16 @@ module.exports = {
       return res.json(comentarios);
     } catch (error) {
       console.error("Error en obtenerComentariosRecibidos:", error);
-      return res.status(500).json({ message: "Error al obtener comentarios" });
+      return res.status(500).json({ message: t(req, "getCommentsError") });
     }
   },
 
-  // GET /api/comentarios/enviados (auth)
   obtenerComentariosEnviados: async (req, res) => {
     const autor_uid = getUid(req);
-    if (!autor_uid) return res.status(401).json({ message: "No autorizado" });
+
+    if (!autor_uid) {
+      return res.status(401).json({ message: t(req, "unauthorized") });
+    }
 
     try {
       const [comentarios] = await db.query(
@@ -167,15 +205,15 @@ module.exports = {
       return res.json(comentarios);
     } catch (error) {
       console.error("Error en obtenerComentariosEnviados:", error);
-      return res.status(500).json({ message: "Error al obtener tus comentarios" });
+      return res.status(500).json({ message: t(req, "getYourCommentsError") });
     }
   },
 
-  // GET /api/comentarios/por-evento/:id (pública)
   getComentariosPorEvento: async (req, res) => {
     const fiestaId = Number(req.params.id);
+
     if (!Number.isInteger(fiestaId) || fiestaId <= 0) {
-      return res.status(400).json({ message: "ID inválido" });
+      return res.status(400).json({ message: t(req, "invalidId") });
     }
 
     try {
@@ -190,7 +228,6 @@ module.exports = {
           c.created_at AS fecha_creacion,
           c.status,
           f.titulo AS titulo_fiesta,
-
           u.username AS autor_nombre,
           u.profile_picture AS autor_avatar
         FROM comentarios c
@@ -206,12 +243,11 @@ module.exports = {
       return res.json(comentarios);
     } catch (error) {
       console.error("Error en getComentariosPorEvento:", error);
-      return res.status(500).json({ message: "Error al obtener comentarios del evento" });
+      return res.status(500).json({ message: t(req, "getEventCommentsError") });
     }
   },
 
-  // GET /api/comentarios/top (pública)
-  getComentariosTop: async (_req, res) => {
+  getComentariosTop: async (req, res) => {
     try {
       const [comentarios] = await db.query(
         `
@@ -224,7 +260,6 @@ module.exports = {
           c.created_at AS fecha_creacion,
           c.status,
           f.titulo AS titulo_fiesta,
-
           u.username AS autor_nombre,
           u.profile_picture AS autor_avatar
         FROM comentarios c
@@ -239,7 +274,7 @@ module.exports = {
       return res.json(comentarios);
     } catch (error) {
       console.error("Error en getComentariosTop:", error);
-      return res.status(500).json({ message: "Error al obtener comentarios destacados" });
+      return res.status(500).json({ message: t(req, "getTopCommentsError") });
     }
   },
 };

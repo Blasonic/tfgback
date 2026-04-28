@@ -1,5 +1,38 @@
 const { haversineKm } = require("./distanceUtils");
 
+const texts = {
+  es: {
+    veryClose: "Muy cerca de tu ubicación",
+    close: "Cerca de tu ubicación",
+    reasonableDistance: "A una distancia razonable",
+    matchesMunicipality: (municipio) => `Coincide con ${municipio}`,
+    matchesCategory: (categoria) => `Encaja en ${categoria}`,
+    matchesTags: (tags) => `Coincide en tags: ${tags.join(", ")}`,
+    matchesTimeWindow: "Encaja en la franja horaria",
+    goodRating: "Tiene buena valoración",
+    matchesPreferences: "Se parece a tus preferencias",
+    matchesLikedTags: "Coincide con tags que te gustan",
+    alreadySaved: "Ya lo tienes guardado",
+  },
+  en: {
+    veryClose: "Very close to your location",
+    close: "Close to your location",
+    reasonableDistance: "Within a reasonable distance",
+    matchesMunicipality: (municipio) => `Matches ${municipio}`,
+    matchesCategory: (categoria) => `Fits ${categoria}`,
+    matchesTags: (tags) => `Matches tags: ${tags.join(", ")}`,
+    matchesTimeWindow: "Fits the selected time window",
+    goodRating: "Has a good rating",
+    matchesPreferences: "Similar to your preferences",
+    matchesLikedTags: "Matches tags you like",
+    alreadySaved: "You already have it saved",
+  },
+};
+
+function getTexts(language = "es") {
+  return texts[language] || texts.es;
+}
+
 function hourFromSqlDate(sqlDate) {
   if (!sqlDate) return null;
 
@@ -31,7 +64,9 @@ function scoreRating(event) {
   return Math.min(avg / 5, 1) * 0.1;
 }
 
-function scoreDistanceToBase(event, baseLocation) {
+function scoreDistanceToBase(event, baseLocation, language = "es") {
+  const t = getTexts(language);
+
   if (
     !baseLocation ||
     typeof baseLocation.lat !== "number" ||
@@ -46,7 +81,12 @@ function scoreDistanceToBase(event, baseLocation) {
     };
   }
 
-  const km = haversineKm(baseLocation.lat, baseLocation.lng, event.lat, event.lng);
+  const km = haversineKm(
+    baseLocation.lat,
+    baseLocation.lng,
+    event.lat,
+    event.lng
+  );
 
   if (typeof km !== "number" || Number.isNaN(km)) {
     return {
@@ -59,7 +99,7 @@ function scoreDistanceToBase(event, baseLocation) {
   if (km < 1.5) {
     return {
       score: 0.15,
-      reason: "Muy cerca de tu ubicación",
+      reason: t.veryClose,
       distanceKm: km,
     };
   }
@@ -67,7 +107,7 @@ function scoreDistanceToBase(event, baseLocation) {
   if (km < 3) {
     return {
       score: 0.1,
-      reason: "Cerca de tu ubicación",
+      reason: t.close,
       distanceKm: km,
     };
   }
@@ -75,7 +115,7 @@ function scoreDistanceToBase(event, baseLocation) {
   if (km < 6) {
     return {
       score: 0.05,
-      reason: "A una distancia razonable",
+      reason: t.reasonableDistance,
       distanceKm: km,
     };
   }
@@ -87,7 +127,7 @@ function scoreDistanceToBase(event, baseLocation) {
   };
 }
 
-function getSignals(userProfile) {
+function getSignals(userProfile = {}) {
   const likedCategories = new Set(userProfile.preferences?.liked_categories || []);
   const likedTags = new Set(userProfile.preferences?.liked_tags || []);
 
@@ -112,7 +152,14 @@ function getSignals(userProfile) {
   };
 }
 
-function scoreEvents(events, userProfile, intent, baseLocation = null) {
+function scoreEvents(
+  events,
+  userProfile = {},
+  intent = {},
+  baseLocation = null,
+  language = "es"
+) {
+  const t = getTexts(language);
   const signals = getSignals(userProfile);
 
   return events
@@ -123,12 +170,12 @@ function scoreEvents(events, userProfile, intent, baseLocation = null) {
 
       if (intent.municipio && event.municipio === intent.municipio) {
         score += 0.25;
-        reasons.push(`Coincide con ${intent.municipio}`);
+        reasons.push(t.matchesMunicipality(intent.municipio));
       }
 
       if (intent.categoria && event.categoria === intent.categoria) {
         score += 0.15;
-        reasons.push(`Encaja en ${intent.categoria}`);
+        reasons.push(t.matchesCategory(intent.categoria));
       }
 
       const matchingTags = (intent.tags || []).filter((tag) =>
@@ -137,24 +184,24 @@ function scoreEvents(events, userProfile, intent, baseLocation = null) {
 
       if (matchingTags.length > 0) {
         score += Math.min(0.2, matchingTags.length * 0.08);
-        reasons.push(`Coincide en tags: ${matchingTags.join(", ")}`);
+        reasons.push(t.matchesTags(matchingTags));
       }
 
       const twScore = scoreTimeWindow(event, intent.timeWindow);
       if (twScore > 0) {
         score += twScore;
-        reasons.push("Encaja en la franja horaria");
+        reasons.push(t.matchesTimeWindow);
       }
 
       const ratingScore = scoreRating(event);
       if (ratingScore > 0) {
         score += ratingScore;
-        reasons.push("Tiene buena valoración");
+        reasons.push(t.goodRating);
       }
 
       if (signals.likedCategories.has(event.categoria)) {
         score += 0.08;
-        reasons.push("Se parece a tus preferencias");
+        reasons.push(t.matchesPreferences);
       }
 
       const likedTagMatches = eventTags.filter((tag) =>
@@ -163,11 +210,15 @@ function scoreEvents(events, userProfile, intent, baseLocation = null) {
 
       if (likedTagMatches.length > 0) {
         score += Math.min(0.08, likedTagMatches.length * 0.03);
-        reasons.push("Coincide con tags que te gustan");
+        reasons.push(t.matchesLikedTags);
       }
 
       if (intent.nearBaseLocation || intent.useBaseLocation) {
-        const distanceScore = scoreDistanceToBase(event, baseLocation);
+        const distanceScore = scoreDistanceToBase(
+          event,
+          baseLocation,
+          language
+        );
 
         score += distanceScore.score;
 
@@ -184,7 +235,7 @@ function scoreEvents(events, userProfile, intent, baseLocation = null) {
 
       if (signals.savedEventIds.has(Number(event.id))) {
         score -= 0.15;
-        reasons.push("Ya lo tienes guardado");
+        reasons.push(t.alreadySaved);
       }
 
       return {

@@ -40,14 +40,31 @@ function estimateTransitMinutes(km) {
   return Math.round((km / 18) * 60);
 }
 
-function recommendTransportMode(km) {
+function recommendTransportMode(km, language = "es") {
+  const texts = {
+    es: {
+      default: "transporte público",
+      walk: "andando",
+      medium: "transporte público o taxi",
+      long: "coche o transporte público",
+    },
+    en: {
+      default: "public transport",
+      walk: "walking",
+      medium: "public transport or taxi",
+      long: "car or public transport",
+    },
+  };
+
+  const t = texts[language] || texts.es;
+
   if (typeof km !== "number" || Number.isNaN(km)) {
-    return "transporte público";
+    return t.default;
   }
 
-  if (km < 1.5) return "andando";
-  if (km < 6) return "transporte público o taxi";
-  return "coche o transporte público";
+  if (km < 1.5) return t.walk;
+  if (km < 6) return t.medium;
+  return t.long;
 }
 
 module.exports = {

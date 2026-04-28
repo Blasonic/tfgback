@@ -4,10 +4,46 @@ function safeTags(v) {
   return Array.isArray(v) ? v : [];
 }
 
-/**
- * GET /api/fiestas/aceptadas (pública)
- * published + no borradas
- */
+function getLang(req) {
+  return req.headers["accept-language"]?.startsWith("en") ? "en" : "es";
+}
+
+const messages = {
+  es: {
+    loadEventsError: "Error cargando eventos",
+    unauthorized: "No autorizado",
+    missingRequired:
+      "Faltan datos obligatorios (titulo, descripcion, start_at, end_at, categoria)",
+    requestSent: "Solicitud enviada",
+    registerEventError: "Error al registrar el evento",
+    pendingEventsError: "Error al obtener eventos pendientes",
+    eventNotFound: "Evento no encontrado",
+    eventAccepted: "Evento aceptado",
+    acceptEventError: "Error al aceptar evento",
+    eventDeleted: "Evento eliminado",
+    deleteEventError: "Error al eliminar evento",
+  },
+  en: {
+    loadEventsError: "Error loading events",
+    unauthorized: "Unauthorized",
+    missingRequired:
+      "Required data is missing (titulo, descripcion, start_at, end_at, categoria)",
+    requestSent: "Request sent",
+    registerEventError: "Error registering the event",
+    pendingEventsError: "Error retrieving pending events",
+    eventNotFound: "Event not found",
+    eventAccepted: "Event accepted",
+    acceptEventError: "Error accepting event",
+    eventDeleted: "Event deleted",
+    deleteEventError: "Error deleting event",
+  },
+};
+
+function t(req, key) {
+  const lang = getLang(req);
+  return messages[lang][key] || messages.es[key] || key;
+}
+
 exports.listAcceptedEvents = async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -17,33 +53,27 @@ exports.listAcceptedEvents = async (req, res) => {
          AND is_deleted = 0
        ORDER BY start_at ASC`
     );
+
     res.json(rows);
   } catch (error) {
     console.error("Error en listAcceptedEvents:", error);
-    res.status(500).json({ message: "Error cargando eventos" });
+    res.status(500).json({ message: t(req, "loadEventsError") });
   }
 };
 
-/**
- * POST /api/fiestas/solicitar (auth)
- * Insertamos como "draft" (pendiente de revisión)
- */
 exports.requestEvent = async (req, res) => {
   const {
     titulo,
     descripcion,
     start_at,
     end_at,
-
     categoria,
     categoria_detalle,
     tags,
-
     imagen,
     provincia,
     municipio,
     direccion,
-
     lat,
     lng,
   } = req.body;
@@ -51,12 +81,12 @@ exports.requestEvent = async (req, res) => {
   const creado_por_uid = req.user?.id;
 
   if (!creado_por_uid) {
-    return res.status(401).json({ message: "No autorizado" });
+    return res.status(401).json({ message: t(req, "unauthorized") });
   }
 
   if (!titulo || !descripcion || !start_at || !end_at || !categoria) {
     return res.status(400).json({
-      message: "Faltan datos obligatorios (titulo, descripcion, start_at, end_at, categoria)",
+      message: t(req, "missingRequired"),
     });
   }
 
@@ -77,14 +107,10 @@ exports.requestEvent = async (req, res) => {
         descripcion.trim(),
         start_at,
         end_at,
-
-        // compat: puedes seguir usando tipo en UI si quieres
         categoria,
-
         categoria,
         categoria_detalle?.trim() || null,
         JSON.stringify(safeTags(tags)),
-
         creado_por_uid,
         imagen?.trim() || null,
         (provincia || "Madrid").trim(),
@@ -95,17 +121,13 @@ exports.requestEvent = async (req, res) => {
       ]
     );
 
-    res.status(201).json({ message: "Solicitud enviada" });
+    res.status(201).json({ message: t(req, "requestSent") });
   } catch (error) {
     console.error("Error en requestEvent:", error);
-    res.status(500).json({ message: "Error al registrar el evento" });
+    res.status(500).json({ message: t(req, "registerEventError") });
   }
 };
 
-/**
- * GET /api/fiestas/pendientes (admin)
- * draft + no borradas
- */
 exports.getPendingEvents = async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -115,17 +137,14 @@ exports.getPendingEvents = async (req, res) => {
          AND is_deleted = 0
        ORDER BY created_at DESC`
     );
+
     res.json(rows);
   } catch (error) {
     console.error("Error en getPendingEvents:", error);
-    res.status(500).json({ message: "Error al obtener eventos pendientes" });
+    res.status(500).json({ message: t(req, "pendingEventsError") });
   }
 };
 
-/**
- * PUT /api/fiestas/aceptar/:id (admin)
- * draft -> published
- */
 exports.acceptEvent = async (req, res) => {
   try {
     const [r] = await db.query(
@@ -137,20 +156,16 @@ exports.acceptEvent = async (req, res) => {
     );
 
     if (r.affectedRows === 0) {
-      return res.status(404).json({ message: "Evento no encontrado" });
+      return res.status(404).json({ message: t(req, "eventNotFound") });
     }
 
-    res.json({ message: "Evento aceptado" });
+    res.json({ message: t(req, "eventAccepted") });
   } catch (error) {
     console.error("Error en acceptEvent:", error);
-    res.status(500).json({ message: "Error al aceptar evento" });
+    res.status(500).json({ message: t(req, "acceptEventError") });
   }
 };
 
-/**
- * DELETE /api/fiestas/:id (admin)
- * soft delete usando columnas que ya tienes
- */
 exports.rejectEvent = async (req, res) => {
   try {
     const adminUid = req.user?.id || null;
@@ -166,12 +181,12 @@ exports.rejectEvent = async (req, res) => {
     );
 
     if (r.affectedRows === 0) {
-      return res.status(404).json({ message: "Evento no encontrado" });
+      return res.status(404).json({ message: t(req, "eventNotFound") });
     }
 
-    res.json({ message: "Evento eliminado" });
+    res.json({ message: t(req, "eventDeleted") });
   } catch (error) {
     console.error("Error en rejectEvent:", error);
-    res.status(500).json({ message: "Error al eliminar evento" });
+    res.status(500).json({ message: t(req, "deleteEventError") });
   }
 };

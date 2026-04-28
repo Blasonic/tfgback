@@ -1,9 +1,36 @@
-const db = require('../models/db');
+const db = require("../models/db");
 
-// Helper: asegura que exista el usuario en MySQL (para que no rompa la FK)
+function getLang(req) {
+  return req.headers["accept-language"]?.startsWith("en") ? "en" : "es";
+}
+
+const messages = {
+  es: {
+    unauthorized: "No autorizado",
+    missingFields: "Faltan campos",
+    saveError: "Error al guardar el mensaje.",
+    listError: "Error al obtener mensajes.",
+    invalidData: "Datos inválidos",
+    alreadyAnswered: "Ya fue respondido o no existe.",
+    answerError: "Error al responder el mensaje.",
+  },
+  en: {
+    unauthorized: "Unauthorized",
+    missingFields: "Missing fields",
+    saveError: "Error saving the message.",
+    listError: "Error retrieving messages.",
+    invalidData: "Invalid data",
+    alreadyAnswered: "It has already been answered or does not exist.",
+    answerError: "Error replying to the message.",
+  },
+};
+
+function t(req, key) {
+  const lang = getLang(req);
+  return messages[lang][key] || messages.es[key] || key;
+}
+
 async function ensureMysqlUser(uid) {
-  // OJO: esto asume que users.firebase_uid es PK o UNIQUE (normal)
-  // y que username puede ser NULL (cache mínima).
   await db.query(
     `INSERT INTO users (firebase_uid, role)
      VALUES (?, 'user')
@@ -12,58 +39,80 @@ async function ensureMysqlUser(uid) {
   );
 }
 
-// POST /api/soporte/crear (auth)
 exports.crearMensaje = async (req, res) => {
   const { asunto, mensaje } = req.body;
-  const userUid = req.user?.id; // uid firebase
+  const userUid = req.user?.id;
 
   if (!userUid) {
-    return res.status(401).json({ status: 'error', message: 'No autorizado' });
+    return res.status(401).json({
+      status: "error",
+      message: t(req, "unauthorized"),
+    });
   }
+
   if (!asunto || !mensaje) {
-    return res.status(400).json({ status: 'error', message: 'Faltan campos' });
+    return res.status(400).json({
+      status: "error",
+      message: t(req, "missingFields"),
+    });
   }
 
   try {
-    // ✅ 1) Asegura que el user exista en users (evita error FK)
     await ensureMysqlUser(userUid);
 
-    // ✅ 2) Inserta soporte
     const [result] = await db.query(
       `INSERT INTO soporte_mensajes (user_uid, asunto, mensaje, status)
        VALUES (?, ?, ?, 'open')`,
       [userUid, asunto, mensaje]
     );
 
-    res.status(201).json({ status: 'ok', id: result.insertId });
+    res.status(201).json({
+      status: "ok",
+      id: result.insertId,
+    });
   } catch (err) {
-    console.error('❌ Error en crearMensaje:', err);
-    res.status(500).json({ status: 'error', message: 'Error al guardar el mensaje.' });
+    console.error("❌ Error en crearMensaje:", err);
+    res.status(500).json({
+      status: "error",
+      message: t(req, "saveError"),
+    });
   }
 };
 
-// GET /api/soporte/lista (admin)
 exports.listarMensajes = async (req, res) => {
   try {
-    // ✅ tu tabla usa created_at (según capturas)
-    const [rows] = await db.query('SELECT * FROM soporte_mensajes ORDER BY created_at DESC');
+    const [rows] = await db.query(
+      "SELECT * FROM soporte_mensajes ORDER BY created_at DESC"
+    );
     res.json(rows);
   } catch (err) {
-    console.error('❌ Error al listar mensajes:', err);
-    res.status(500).json({ status: 'error', message: 'Error al obtener mensajes.' });
+    console.error("❌ Error al listar mensajes:", err);
+    res.status(500).json({
+      status: "error",
+      message: t(req, "listError"),
+    });
   }
 };
 
-// POST /api/soporte/responder (admin)
 exports.responderMensaje = async (req, res) => {
   const { id, respuesta } = req.body;
   const adminUid = req.user?.id;
 
-  if (!adminUid) return res.status(401).json({ status: 'error', message: 'No autorizado' });
-  if (!id || !respuesta) return res.status(400).json({ status: 'error', message: 'Datos inválidos' });
+  if (!adminUid) {
+    return res.status(401).json({
+      status: "error",
+      message: t(req, "unauthorized"),
+    });
+  }
+
+  if (!id || !respuesta) {
+    return res.status(400).json({
+      status: "error",
+      message: t(req, "invalidData"),
+    });
+  }
 
   try {
-    // ✅ asegura admin en users también (si tienes FK answered_by_uid)
     await ensureMysqlUser(adminUid);
 
     const [resultado] = await db.query(
@@ -74,12 +123,18 @@ exports.responderMensaje = async (req, res) => {
     );
 
     if (resultado.affectedRows === 0) {
-      return res.status(400).json({ status: 'error', message: 'Ya fue respondido o no existe.' });
+      return res.status(400).json({
+        status: "error",
+        message: t(req, "alreadyAnswered"),
+      });
     }
 
-    res.json({ status: 'ok' });
+    res.json({ status: "ok" });
   } catch (err) {
-    console.error('❌ Error al responder mensaje:', err);
-    res.status(500).json({ status: 'error', message: 'Error al responder el mensaje.' });
+    console.error("❌ Error al responder mensaje:", err);
+    res.status(500).json({
+      status: "error",
+      message: t(req, "answerError"),
+    });
   }
 };
