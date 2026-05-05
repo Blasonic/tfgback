@@ -1,0 +1,19 @@
+{
+  "madrid": { "label": "Madrid", "zone": "A", "isCapital": true },
+
+  "leganes": { "label": "Leganés", "zone": "B1", "isCapital": false },
+  "getafe": { "label": "Getafe", "zone": "B1", "isCapital": false },
+  "alcorcon": { "label": "Alcorcón", "zone": "B1", "isCapital": false },
+  "mostoles": { "label": "Móstoles", "zone": "B2", "isCapital": false },
+  "fuenlabrada": { "label": "Fuenlabrada", "zone": "B2", "isCapital": false },
+  "parla": { "label": "Parla", "zone": "B2", "isCapital": false },
+
+  "alcobendas": { "label": "Alcobendas", "zone": "B1", "isCapital": false },
+  "san_sebastian_de_los_reyes": { "label": "San Sebastián de los Reyes", "zone": "B1", "isCapital": false },
+  "torrejon_de_ardoz": { "label": "Torrejón de Ardoz", "zone": "B1", "isCapital": false },
+
+  "alcala_de_henares": { "label": "Alcalá de Henares", "zone": "B3", "isCapital": false },
+
+  "aranjuez": { "label": "Aranjuez", "zone": "C1", "isCapital": false },
+  "chinchon": { "label": "Chinchón", "zone": "C2", "isCapital": false }
+}

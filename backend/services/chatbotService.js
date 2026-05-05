@@ -4,6 +4,7 @@ const { parseMessage } = require("./intentParser");
 const { scoreEvents } = require("./recommendationService");
 const { buildRoute } = require("./routePlannerService");
 const { geocodeFirstResult } = require("./geocodingService");
+
 const {
   haversineKm,
   estimateWalkMinutes,
@@ -11,6 +12,8 @@ const {
   estimateTransitMinutes,
   recommendTransportMode,
 } = require("./distanceUtils");
+
+const { buildSimulatedMultimodalRoute } = require("./multimodalRouteService");
 
 const {
   buildClarificationResponse,
@@ -286,15 +289,37 @@ function buildRouteInfo(
   walkMinutes,
   carMinutes,
   transitMinutes,
-  recommendedMode
+  recommendedMode,
+  language = "es"
 ) {
+  const multimodalRoute = buildSimulatedMultimodalRoute({
+    origin: {
+      label: originLocation?.label,
+      address: originLocation?.address,
+      lat: originLocation?.lat,
+      lng: originLocation?.lng,
+      municipio: originLocation?.municipio || originLocation?.city || "Madrid",
+    },
+    destination: {
+      label: event?.titulo,
+      address: event?.direccion,
+      lat: event?.lat,
+      lng: event?.lng,
+      municipio: event?.municipio || "Madrid",
+    },
+    distanceKm,
+    estimatedTrips: 1,
+    lang: language,
+  });
+
   return {
     origin: originLocation,
-    distance_km: distanceKm,
+    distance_km: Number(distanceKm.toFixed(2)),
     walk_minutes: walkMinutes,
     car_minutes: carMinutes,
     transit_minutes: transitMinutes,
     recommended_mode: recommendedMode,
+    multimodalRoute,
     maps_links: {
       walking: buildGoogleMapsDirectionsUrl(originLocation, event, "walking"),
       driving: buildGoogleMapsDirectionsUrl(originLocation, event, "driving"),
@@ -621,10 +646,12 @@ async function processMessage({
         event.lat,
         event.lng
       );
+
       const walkMinutes = estimateWalkMinutes(distanceKm);
       const carMinutes = estimateCarMinutes(distanceKm);
       const transitMinutes = estimateTransitMinutes(distanceKm);
       const recommendedMode = recommendTransportMode(distanceKm);
+
       const transportExplanation = buildTransportExplanation(
         distanceKm,
         recommendedMode,
@@ -650,7 +677,8 @@ async function processMessage({
               walkMinutes,
               carMinutes,
               transitMinutes,
-              recommendedMode
+              recommendedMode,
+              language
             ),
           },
         },
@@ -871,10 +899,12 @@ async function processMessage({
       event.lat,
       event.lng
     );
+
     const walkMinutes = estimateWalkMinutes(distanceKm);
     const carMinutes = estimateCarMinutes(distanceKm);
     const transitMinutes = estimateTransitMinutes(distanceKm);
     const recommendedMode = recommendTransportMode(distanceKm);
+
     const transportExplanation = buildTransportExplanation(
       distanceKm,
       recommendedMode,
@@ -900,7 +930,8 @@ async function processMessage({
             walkMinutes,
             carMinutes,
             transitMinutes,
-            recommendedMode
+            recommendedMode,
+            language
           ),
         },
       },
